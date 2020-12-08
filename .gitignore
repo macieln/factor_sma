@@ -1,7 +1,9 @@
 #----------------------------------------PROJECT IGNORES----------------------------------------
+.gitignore
 REPORT.csv
 .vscode
-.gitignore
+reviewReport.json
+
 
 
 

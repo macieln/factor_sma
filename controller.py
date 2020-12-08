@@ -18,21 +18,19 @@
 
     [WO DATA MODEL]
 
-    -------------------------------------------------------------------------------------
-    | parameter        |   Value Type       |   Description                             |
-    -------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------
+    | PARAMETER |   VALUE TYPE |   DESCRIPTION                                           |
+    --------------------------------------------------------------------------------------
 
-     ------------------------------------------------------------------------------------
-    | id        |   int       |   Primary key for work order. This is the same as       | 
-    |           |             |     vendor WO id & it is saved in first column of       |
-    |           |             |     REPORT.                                             |
-    -------------------------------------------------------------------------------------
-
-     ------------------------------------------------------------------------------------
-    |         |          |          | 
-    |           |             |            |
-    |           |             |                                                  |
-    -------------------------------------------------------------------------------------
+     -------------------------------------------------------------------------------------
+    | id        |   int        |   Primary key for work order. This is the same as       | 
+    |           |              |     vendor WO id & it is saved in first column of       |
+    |           |              |     REPORT.                                             |
+    --------------------------------------------------------------------------------------
+    |           |              |                                                         | 
+    |           |              |                                                         |
+    |           |              |                                                         |
+    --------------------------------------------------------------------------------------
 
     [DESCRIPTION]
 
@@ -58,12 +56,36 @@ import csv
 from datetime import datetime
 import json
 
+def intervalConverter(intervalStr):
+
+    if not intervalStr:
+        return 0.0
+    dateStr = (intervalStr.split(' ')[0]).strip()
+    month = int(dateStr.split('/')[0])
+    day = int(dateStr.split('/')[1])
+    year = int(dateStr.split('/')[2])
+
+    timeStr = (intervalStr.split(' ')[1]).strip()
+    hrs = int(timeStr.split(':')[0])
+    mins = int(timeStr.split(':')[1])
+
+    if year <= 0 or year < 1999:
+        year += 2000
+
+    if month <= 0 or month >= 32:
+        month = 1
+
+    if day <= 0:
+        day = 1
+
+    return datetime(year, month, day, hrs, mins)
+
 # [1] ------------------------------------------------------------------
 reportFile = "REPORT.csv"
 reportWOs = []
 formatedWOs = []
 
-with open(reportFile, encoding="utf8") as report:    
+with open(reportFile) as report:    
     reportWOs = csv.reader(report)
 
 # [2] ------------------------------------------------------------------
@@ -72,11 +94,11 @@ with open(reportFile, encoding="utf8") as report:
     initialDayCount = 0
 
     while not inputValidation:        
-        userInput = input("Enter intial WOs scraping date in format 'YYYY-MM-DD' or leave blank to scrape 2 days before today: ")
+        userInput = input("\nEnter intial WOs scraping date in format 'YYYY-MM-DD' or leave blank to scrape 2 days before today: ")
 
         if not userInput:
             inputValidation = True
-            initialDayCount = 2
+            initialDayCount = 15
         else:
             try:
                 datetime.fromisoformat(userInput)                
@@ -86,101 +108,72 @@ with open(reportFile, encoding="utf8") as report:
                 inputValidation = True
                 initialDayCount = datetime.now() - datetime.fromisoformat(userInput)
         
-        if initialDayCount.days < 1:
+        if initialDayCount < 1:
             initialDayCount = 1
 
-        print(f"Scrap Days: {initialDayCount}")
+        print(f"\n\nScrap Days: {initialDayCount}\n\n")
                 
-    def intervalConverter(intervalStr):
-        dateStr = (intervalStr.split(' ')[0]).strip()
-        month = int(dateStr.split('/')[0])
-        day = int(dateStr.split('/')[1])
-        year = int(dateStr.split('/')[2])
-
-        timeStr = (intervalStr.split(' ')[1]).strip()
-        hrs = int(timeStr.split(':')[0])
-        mins = int(timeStr.split(':')[1])
-
-        if year <= 0 or year < 1999:
-            year += 2000
-        
-        if month <= 0 or month >= 32:
-            month = 1
-
-        if day <= 0:
-            day = 1
-
-        return datetime(year, month, day, hrs, mins)
     header = False
+    woModel = {}
 
     for order in reportWOs:
-        woModel = {
-            "id": 0,
-            "tool": "", 
-            "chamber": "", 
-            "type": "", 
-            "mode": "", 
-            "root": "",
-            "corrective": "",
-            "start": "",
-            "end": "",
-            "downTime": 0.0,
-            "delayTotal": 0.0,
-            "totalTime": 0.0,
-            "techs": [], 
-            "notes": "",
-            "repeat": {},
-            "delays": [],
-            "exchanges": [],
-            "uptime": False,
-            "review": False
-        }
-
         if not header:
             header = True
+        elif initialDayCount <= 0:
+            break
         else:
-            woModel["id"] = int(order[0])
-            woModel["tool"] = order[2]
-            woModel["chamber"] = order[9]
-            woModel["type"] = (order[10].title()).strip()
-            woModel["mode"] = order[13].strip()
-            woModel["root"] = ""
-            woModel["corrective"] = order[12].strip()
-            woModel["start"] = intervalConverter(order[25])
-            woModel["end"] = intervalConverter(order[26])
-            woModel["downTime"] = woModel["end"] - woModel["start"]
-            woModel["delayTotal"] = 0.0
-            woModel["totalTime"] = 0.0
-            woModel["techs"] = [order[14].strip(), order[30].strip()]
-            woModel["notes"] = order[21].strip()
-            woModel["repeat"] = {}
-            woModel["delays"] = []
-            woModel["exchanges"] = []
-            woModel["uptime"] = False
-            woModel["review"] = False
+            woModel = {
+                "tool": order[2],
+                "chamber": order[9], 
+                "type": (order[10].title()).strip(), 
+                "mode": order[13].strip(), 
+                "root": "",
+                "corrective": order[12].strip(),
+                "start": intervalConverter(order[25].strip()),
+                "end": intervalConverter(order[26].strip()),
+                "downTime": woModel["end"] - woModel["start"],
+                "delayTotal": 0.0,
+                "totalTime": 0.0,
+                "techs": [order[14].strip(), order[30].strip()], 
+                "notes": order[21].strip(),
+                "repeat": {},
+                "delays": [],
+                "exchanges": [],
+                "uptime": False,
+                "review": False
+            }
 
-        formatedWOs.append(woModel)
+            woModel["start"] = str(intervalConverter(order[25]))
+            woModel["end"] = str(intervalConverter(order[26]))
 
-# [3] ------------------------------------------------------------------
-# with open("stagedWOs.json", w) as 
-for number in range(0, 16):
-    print(  
-            f"Scrape Count: {number}", " ",
-            formatedWOs[number]["id"], " ",
-            formatedWOs[number]["tool"], " ",
-            formatedWOs[number]["chamber"], " ",
-            formatedWOs[number]["type"], " ",
-            formatedWOs[number]["mode"], " ",
-            formatedWOs[number]["root"], " ",
-            formatedWOs[number]["corrective"], " ",
-            formatedWOs[number]["start"], " ",
-            formatedWOs[number]["end"], " ",
-            formatedWOs[number]["downTime"], " ",
-            formatedWOs[number]["delayTotal"], " ",
-            formatedWOs[number]["totalTime"], " ",
-            formatedWOs[number]["techs"], " ",
-            formatedWOs[number]["notes"], " ",
-            formatedWOs[number]["repeat"], " ",
-            formatedWOs[number]["delays"], " ",
-            formatedWOs[number]["exchanges"], " \n"
-    )
+            formatedWOs.append({str(order[0]): woModel})
+
+            initialDayCount -= 1
+    
+    # formatedWOs = formatedWOs[1:]
+
+#[3] ------------------------------------------------------------------
+with open("reviewReport.json", "w") as reviewReport:
+    reviewReport.write(json.dumps(formatedWOs, indent="     "))
+
+# for number in range(0, 16):
+#     print(  
+#             f"Scrape Count: {number}", " ",
+#             formatedWOs[number]["id"], " ",
+#             formatedWOs[number]["tool"], " ",
+#             formatedWOs[number]["chamber"], " ",
+#             formatedWOs[number]["type"], " ",
+#             formatedWOs[number]["mode"], " ",
+#             formatedWOs[number]["root"], " ",
+#             formatedWOs[number]["corrective"], " ",
+#             formatedWOs[number]["start"], " ",
+#             formatedWOs[number]["end"], " ",
+#             formatedWOs[number]["downTime"], " ",
+#             formatedWOs[number]["delayTotal"], " ",
+#             formatedWOs[number]["totalTime"], " ",
+#             formatedWOs[number]["techs"], " ",
+#             formatedWOs[number]["notes"], " ",
+#             formatedWOs[number]["repeat"], " ",
+#             formatedWOs[number]["delays"], " ",
+#             formatedWOs[number]["exchanges"], " \n"
+#     )
